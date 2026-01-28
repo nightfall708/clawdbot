@@ -27,6 +27,18 @@ const NodeHostSchema = z
   .strict()
   .optional();
 
+const CloudSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    endpoint: z.string().optional(),
+    licenseKey: z.string().optional(),
+    runtimeId: z.string().optional(),
+    instanceId: z.string().optional(),
+    headless: z.boolean().optional(),
+  })
+  .strict()
+  .optional();
+
 export const ClawdbotSchema = z
   .object({
     meta: z
@@ -59,6 +71,7 @@ export const ClawdbotSchema = z
       })
       .strict()
       .optional(),
+    cloud: CloudSchema,
     diagnostics: z
       .object({
         enabled: z.boolean().optional(),

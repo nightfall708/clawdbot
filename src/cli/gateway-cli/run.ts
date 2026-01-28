@@ -3,9 +3,9 @@ import fs from "node:fs";
 import type { Command } from "commander";
 import type { GatewayAuthMode } from "../../config/config.js";
 import {
-  CONFIG_PATH_CLAWDBOT,
   loadConfig,
   readConfigFileSnapshot,
+  resolveConfigPath,
   resolveGatewayPort,
 } from "../../config/config.js";
 import { resolveGatewayAuth } from "../../gateway/auth.js";
@@ -36,6 +36,13 @@ type GatewayRunOpts = {
   token?: unknown;
   auth?: unknown;
   password?: unknown;
+  config?: unknown;
+  headless?: boolean;
+  cloudManaged?: boolean;
+  cloudEndpoint?: unknown;
+  licenseKey?: unknown;
+  runtimeId?: unknown;
+  instanceId?: unknown;
   tailscale?: unknown;
   tailscaleResetOnExit?: boolean;
   allowUnconfigured?: boolean;
@@ -87,6 +94,33 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
   const rawStreamPath = toOptionString(opts.rawStreamPath);
   if (rawStreamPath) {
     process.env.CLAWDBOT_RAW_STREAM_PATH = rawStreamPath;
+  }
+
+  const configPathOverride = toOptionString(opts.config);
+  if (configPathOverride) {
+    process.env.CLAWDBOT_CONFIG_PATH = configPathOverride;
+  }
+  if (opts.headless) {
+    process.env.CLAWDBOT_HEADLESS = "1";
+  }
+  if (opts.cloudManaged) {
+    process.env.CLAWDBOT_CLOUD_MANAGED = "1";
+  }
+  const cloudEndpoint = toOptionString(opts.cloudEndpoint);
+  if (cloudEndpoint) {
+    process.env.CLAWDBOT_CLOUD_ENDPOINT = cloudEndpoint;
+  }
+  const licenseKey = toOptionString(opts.licenseKey);
+  if (licenseKey) {
+    process.env.CLAWDBOT_CLOUD_LICENSE_KEY = licenseKey;
+  }
+  const runtimeId = toOptionString(opts.runtimeId);
+  if (runtimeId) {
+    process.env.CLAWDBOT_CLOUD_RUNTIME_ID = runtimeId;
+  }
+  const instanceId = toOptionString(opts.instanceId);
+  if (instanceId) {
+    process.env.CLAWDBOT_CLOUD_INSTANCE_ID = instanceId;
   }
 
   if (devMode) {
@@ -157,11 +191,12 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
   const passwordRaw = toOptionString(opts.password);
   const tokenRaw = toOptionString(opts.token);
 
-  const configExists = fs.existsSync(CONFIG_PATH_CLAWDBOT);
+  const configPath = resolveConfigPath();
+  const configExists = fs.existsSync(configPath);
   const mode = cfg.gateway?.mode;
   if (!opts.allowUnconfigured && mode !== "local") {
-    if (!configExists) {
-      defaultRuntime.error(
+      if (!configExists) {
+        defaultRuntime.error(
         `Missing config. Run \`${formatCliCommand("clawdbot setup")}\` or set gateway.mode=local (or pass --allow-unconfigured).`,
       );
     } else {
@@ -318,8 +353,19 @@ export function addGatewayRunCommand(cmd: Command): Command {
       "--token <token>",
       "Shared token required in connect.params.auth.token (default: CLAWDBOT_GATEWAY_TOKEN env if set)",
     )
+    .option("--config <path>", "Override CLAWDBOT_CONFIG_PATH for this run")
     .option("--auth <mode>", 'Gateway auth mode ("token"|"password")')
     .option("--password <password>", "Password for auth mode=password")
+    .option("--headless", "Run without interactive prompts (sets CLAWDBOT_HEADLESS=1)", false)
+    .option(
+      "--cloud-managed",
+      "Enable OS1 cloud-managed mode (sets CLAWDBOT_CLOUD_MANAGED=1)",
+      false,
+    )
+    .option("--cloud-endpoint <url>", "Override OS1 cloud endpoint")
+    .option("--license-key <key>", "OS1 cloud license key")
+    .option("--runtime-id <id>", "OS1 runtime id (for managed instances)")
+    .option("--instance-id <id>", "OS1 instance id (for managed instances)")
     .option("--tailscale <mode>", 'Tailscale exposure mode ("off"|"serve"|"funnel")')
     .option(
       "--tailscale-reset-on-exit",

@@ -1,6 +1,8 @@
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { initSubagentRegistry } from "../agents/subagent-registry.js";
 import { registerSkillsChangeListener } from "../agents/skills/refresh.js";
+import { resolveCloudConfig } from "../cloud/config.js";
+import { startCloudConnector } from "../cloud/connector.js";
 import type { CanvasHostServer } from "../canvas-host/server.js";
 import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js";
 import { createDefaultDeps } from "../cli/deps.js";
@@ -210,6 +212,10 @@ export async function startGatewayServer(
   }
 
   const cfgAtStart = loadConfig();
+  const cloudConfig = resolveCloudConfig(cfgAtStart);
+  const cloudConnector = cloudConfig
+    ? startCloudConnector({ config: cloudConfig })
+    : null;
   const diagnosticsEnabled = isDiagnosticsEnabled(cfgAtStart);
   if (diagnosticsEnabled) {
     startDiagnosticHeartbeat();
@@ -579,6 +585,9 @@ export async function startGatewayServer(
         skillsRefreshTimer = null;
       }
       skillsChangeUnsub();
+      if (cloudConnector) {
+        await cloudConnector.stop();
+      }
       await close(opts);
     },
   };
